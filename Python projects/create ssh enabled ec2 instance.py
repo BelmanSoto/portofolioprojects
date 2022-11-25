@@ -52,8 +52,7 @@ def create_securuity_group () :
                     'FromPort': 22, #ssh port
                     'ToPort': 22,
                     'IpRanges': [{'CidrIp': '0.0.0.0/0'}]}
-                ])
-
+                ]) 
         #if the name already exists for the sg, it gets the security group id and assigns it to the sg_id value to be used
         except ClientError as e:
             if str(e).__contains__('already exists') :
