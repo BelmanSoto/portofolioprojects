@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: 2010-09-09
+Resources:
+
+# Creates a private S3 bucket resource for website hosting that gets deleted if the stack is deleted
+  S3Bucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      AccessControl: Private
+
+      WebsiteConfiguration: #This configures the s3 to host a static website
+        IndexDocument: index.html
+        #ErrorDocument: error.html
+      BucketName: new-belmansoto-1123 #Names the bucket
+    DeletionPolicy: Delete #deletes the bucket if the stack gets deleted
+
+#Creates the CloudFrontOriginAccess Identity for use by the cloud front distribution and bucket policy
+  CloudFrontOAI:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties: 
+      CloudFrontOriginAccessIdentityConfig: 
+        Comment: 'origin identity'
+
+#Bucket policy that allows the cloud front distribution to get objects from the bucket
+  BucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: new-belmansoto-1123
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                    #!Sub allows you to use a variable inside of a string. The variable here is the CF OAI resource
+                AWS: !Sub 'arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${CloudFrontOAI}' 
+              Action: 's3:GetObject'
+              Resource: arn:aws:s3:::new-belmansoto-1123/*
+
+#Creates the cloudfront Distribution and configures it to use the Cloud Front OAI created above
+  mycfdistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Origins:
+          - DomainName: new-belmansoto-1123.s3.us-east-1.amazonaws.com
+            Id: S3-new-belmansoto-1123
+            S3OriginConfig:
+              #This configures the origin so that viewers can only access objects through CloudFront
+              OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOAI}' 
+
+        Enabled: 'true' #Enables the distribution/Turns the distribution on
+        DefaultRootObject: index.html #redirects users from the .com url to .com/index.html
+
+        #Uncomment this if you need to set cache behaviors with multiple origins
+        # CacheBehaviors:
+        #   - LambdaFunctionAssociations:
+        #       - EventType: string-value
+        #         LambdaFunctionARN: string-value
+
+        PriceClass: PriceClass_100
+
+        DefaultCacheBehavior:
+          AllowedMethods:
+              - GET
+              - HEAD
+
+          # LambdaFunctionAssociations:
+          #   - EventType: string-value
+          #     LambdaFunctionARN: string-value
+
+          TargetOriginId: S3-new-belmansoto-1123 #This is the origin that the distribution will route requests to.
+
+          ForwardedValues: #sets some caching 
+            QueryString: 'false'
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: 'true'
+
+        # IPV6Enabled: boolean-value
+             
