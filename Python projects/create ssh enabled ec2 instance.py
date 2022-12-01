@@ -9,16 +9,31 @@ import os
 ec2_client = boto3.client('ec2', region_name='us-east-1')
 ec2 = boto3.resource('ec2')
 
-#Prompt user for a ec2 name
-ec2Name = input('Enter a unique name for your ec2: ')
-namecheck = str(ec2_client.describe_instances())
+def nameEc2():
+    global ec2Name
+    namecheck = ec2_client.describe_instances()
+    currentEc2Names = []
+    #This block of code iterates down to the tags dictionary and appends the names of the ec2 to a list. This may not work if multiple tags are used for an instance
+    for items in namecheck['Reservations'] :
+        for inst in items['Instances'] :
+            for tags in inst['Tags'] :
+                #print(tags)-for testing purposes
+                currentEc2Names.append(tags['Value'])
 
-while True :
-    if ec2Name in namecheck :
-        ec2Name = input ('That name already exists, try again ')
-        continue
-    else :
-        break
+    print(f'These names already exists. {currentEc2Names}')
+    #Prompt user for a ec2 name
+    ec2Name = input('Enter a unique name for your ec2: ')
+    
+    #pprint.pprint(namecheck)-for testing purposes
+    
+
+    #checks if the ec2 name that the user input already exists
+    while True :
+        if ec2Name in currentEc2Names :
+            ec2Name = input ('That name already exists, try again ')
+            continue
+        else :
+            break
 
 #Gets the default vpc id for use by the security group
 response = ec2_client.describe_vpcs()
@@ -60,7 +75,7 @@ def create_securuity_group () :
                 security_group_id = response["SecurityGroups"][0]['GroupId']
             else: print(e)
 
-
+#function to create a unique key pair. user gets here from the ask_key function
 def create_keypair () :
     global kpname
     while True:
@@ -69,18 +84,21 @@ def create_keypair () :
             response = ec2_client.create_key_pair(
                 KeyName= kpname
             )
-            accesskey = response['KeyMaterial']
+            accesskey = response['KeyMaterial'] #this is the access key stored as a variable
+            
+            #writes the access key to a pem file to the user's directory
             with open(f'{kpname}.pem', 'w' ) as f:
                 f.write(accesskey) 
             print('Successfully created the keypair and saved it to a file in your directory!')
             time.sleep(3)
             break
             # os.system('cls')
-        except: 
-            print('That name is already in use.')
-            time.sleep(1)
+        except ClientError as e: 
+            print(e)
+            time.sleep(3)
             continue
 
+#creates an ec2 instance using the keypair and name the user specifies. uses a security group made by the script
 def create_ec2_instance() :
     try: 
         print('Creating ec2 instance')
@@ -106,18 +124,19 @@ def create_ec2_instance() :
     except Exception as e:
         print(e)
 
+#checks to see if the instance is running and updates the user
 def check_status( ):
     print('Checking your instance status')
-    global inId
+    global inId #instance id of the instance the user created
     filters = [{'Name':'tag:Name', 'Values':[ec2Name]}]
     time.sleep(1.5)
     state = True
     while state == True :
         #This loop iterates through the dictionary value that describe_instances returns so that we can get the instance Id for the instance that the user created for use in check_health
-        #and checks assigns to state of the instance to a variable for a conditional statement
+        #and checks assigns to the state of the instance to a variable for a conditional statement
         for each in ec2_client.describe_instances(Filters=filters)['Reservations']:
             for each_in in each['Instances']:
-                #print(each_in['InstanceId'], each_in['State']['Name'])
+                #print(each_in['InstanceId'], each_in['State']['Name'])-testing purposes
                 response = str(each_in['State']['Name'])
                 inId = [str(each_in['InstanceId'])]
         if response == 'running':
@@ -132,6 +151,7 @@ def check_status( ):
     #status= ec2_client.describe_instance_status(InstanceIds = inId, IncludeAllInstances = True)
     #print(status)
 
+#checks if the instance can be connected to using the instance status attribute and alerts the user to the state
 def check_health() :
     status = True
     count = 0
@@ -159,6 +179,8 @@ def check_health() :
             print('Heatlh checks failed.')
             status = False 
 
+#asks the user if they want to use an existing key, lists the keys, assigns the existing key to a value that's used to create the instance and handles some exceptions.
+#If user says no, then calls the create key function.
 def ask_key() :
     try:
         userkey = input('Do you want to use an existing key for this instance? (Yes/No) ')
@@ -194,7 +216,7 @@ def ask_key() :
         print('Only Yes or No are acceptable answers. Try again.')
         quit()
 
-
+nameEc2()
 ask_key()
 create_securuity_group()
 create_ec2_instance()
