@@ -1,3 +1,6 @@
+#Template that creates a private s3 bucket with a specified name that hosts a static website through cloudfront. access to the bucket is limited to only the distribution through a oai created below
+#All resources needed for this are created using CloudFormation. The html file needs to be manually uploaded.
+
 AWSTemplateFormatVersion: 2010-09-09
 Resources:
 
